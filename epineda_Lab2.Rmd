@@ -1,0 +1,343 @@
+---
+title: "Laboratorio2 - Uso Dplyr"
+author: "Erick J. Pineda Amézquita, 17012140"
+output: html_notebook
+---
+
+
+### Carga y análisis exploratorio de datos:
+
+```{r}
+library(dplyr)
+archivo <- "primary_results.csv"
+ds.votaciones <- read.csv(archivo)
+```
+Conociendo la estructura del dataSet:
+```{r}
+str(ds.votaciones)
+```
+Conociendo el contenido del dataSet
+```{r}
+head(ds.votaciones)
+```
+Nombre de partidos:
+```{r}
+levels(ds.votaciones$party)
+```
+
+Se observa que la fuente de datos tiene 8 columnas con 24,611 filas. 
+El contexto se refiere a actividades relacionadas con los comisios de Estados Unidos, incluyendo información de candidatos, partido, estado y ciudad entre otros.  
+Como observación adicional, se hace mención de la cantidad de partidos políticos que existen en Estados Unidos, a diferencia de otros países.
+  
+   
+   
+   
+     
+# Preguntas a responder
+
+#### 1. ¿Cuántos candidatos estaban en las primarias?
+Identificando candidatos:
+```{r}
+candidatos <- levels(ds.votaciones$candidate)
+```
+Listado de candidatos:
+```{r}
+candidatos
+```
+Realizando conteo de candidatos:
+```{r}
+length(candidatos)
+```
+R// Habían 16 candidados participando para las elecciones primarias.
+
+
+
+
+
+#### 2.¿Cuántos estados participaron?
+```{r}
+length(levels(ds.votaciones$state))
+```
+Según los datos de la fuente, participaron 49 estados en dichas comisiones.
+
+
+
+
+
+#### 3. ¿Qué partido obtuvo la mayor cantidad de votos en Florida?
+```{r}
+ds.votaciones %>%filter (state == "Florida") %>% 
+  group_by(state, party) %>% 
+  summarise(cantidad = n())
+```
+R// El partido con mayor cantidad de votos en Florida fue el partido Replublicano con 268 votos.
+
+
+
+
+
+### 4. ¿Qué condado de Florida es el que tiene la mayor cantidad de votantes?
+```{r}
+ds.votaciones %>%filter (state == "Florida") %>% 
+  group_by(state, county) %>% 
+  summarise(cantidadVotos = sum(votes)) %>% 
+  arrange(-cantidadVotos) %>%   ## Ordenamiento descendente 
+  top_n(1)  ## muestra solo la primera observación
+```
+R// El condado de Florida que tuvo mas cantidad de votantes fue Miami-Dade.
+
+
+
+
+
+### 5. En el estado de florida, que condado tuvo la mayor cantidad de votantes, ¿Qué candidato tuvo la mayor cantidad de votos y de qué partido era?*
+
+\* Se tienen 2 variantes para resolver este problema, según interpretación.  
+
+* 5.1 Candidatos que tuvieron mayor cantidad de votos:
+```{r}
+ds.votaciones %>% group_by(candidate,party) %>% 
+  summarise(cantidadVotos=sum(votes)) %>% 
+  arrange(-cantidadVotos) ## Ordenar de forma descendente
+```
+R// A nivel general, el candidato que tuvo mayor cantidad de votos fue Hillary Clinton del partido Demócrata.  
+
+* 5.2 En el estado de florida, **donde el condado** tuvo la mayor cantidad de votantes, ¿Qué candidato tuvo la mayor cantidad de votos y de qué partido era?
+
+```{r}
+condadoConMasVotos <- ds.votaciones %>%filter (state == "Florida") %>% 
+  group_by(state, county) %>% 
+  summarise(cantidadVotos = sum(votes)) %>% 
+  arrange(-cantidadVotos) %>%   ## Ordenamiento descendente 
+  top_n(1) 
+
+strCondadoConMasVotos <- as.character(condadoConMasVotos$county[1]) ## Obtener nombre como texto
+
+partidoConMasVotos <- ds.votaciones %>%filter (county == strCondadoConMasVotos) %>% 
+                    group_by(party) %>% 
+                    summarise(cantidadVotos = sum(votes)) %>% 
+                    arrange(-cantidadVotos) %>%   ## Ordenamiento descendente 
+                    top_n(1)  ## muestra solo la primera observación
+
+strPartidoConMasVotos <- as.character(partidoConMasVotos$party[1]) ## Obtener nombre
+
+ds.votaciones %>% filter(
+  county==strCondadoConMasVotos,
+  party==strPartidoConMasVotos
+  ) %>% 
+  group_by(state,county,candidate,party) %>% 
+  summarise(votos=sum(votes)) %>% 
+  arrange(-votos)
+
+```
+
+R// El candidato que tuvo mas cantidad de votos fue Marco Rubio con 111,898 votos, dado
+que Florida es el estado con el condado Miami-Dade con mas votaciones de Estados Unidos.
+
+
+
+
+
+### 6. ¿Cuántas personas Votaron por Hillary Clinton y cuántas por Donald Trump en estados unidos?
+  
+Analizando los posibles candidatos:
+```{r}
+levels(ds.votaciones$candidate)
+```
+Seleccionando candidatos específicos:
+```{r}
+listaCandidatos <- c("Donald Trump","Hillary Clinton")
+
+ds.votaciones %>%
+  group_by(candidate) %>% 
+  summarise(votosTotales=sum(votes)) %>% 
+  filter(candidate == listaCandidatos) 
+```
+R// La cantidad de votos que tuvieron los candidatos es:
+Hillary Clinton	  15,692,452	
+Donald Trump	    13,302,541			
+
+
+
+
+### 7. ¿Cuál es la probabilidad de que si alguien sea republicano en florida haya votado por Jeb Bush?
+Cantidad de personas que votaron por Jeb Bush
+```{r}
+votosJebBush <- ds.votaciones %>% 
+                    filter(candidate=="Jeb Bush") %>% 
+                    summarise(sumaVotosJB=sum(votes))
+
+cantidadRepublicanosFlorida <- ds.votaciones %>% 
+                            filter(state=="Florida",
+                                   party=="Republican") %>% 
+                             summarise(sumaVotosRepFL=sum(votes))
+
+cantidadRepublicanosTotal <- ds.votaciones %>% 
+                            filter(party=="Republican") %>% 
+                             summarise(sumaVotosRepTotal=sum(votes))
+
+
+votosJebBush
+cantidadRepublicanosFlorida
+cantidadRepublicanosTotal
+
+probJB <- votosJebBush/cantidadRepublicanosTotal
+probFL <- cantidadRepublicanosFlorida/cantidadRepublicanosTotal
+
+probJB
+probFL
+
+##Probabilidad de que Sea republicano de Florida Dado que votó por Jeb Bush
+### P(RFL | JB ) = P(RFL ^ JB)/P(JB)
+
+probabilidad_RFL_JB <- (probFL*probJB)/(probJB)
+probabilidad_RFL_JB*100
+```
+R// La probabilidad de que sea Republicano de Florida dado que votó por Jeb Bush es del 7.82%
+
+
+
+
+
+### 8. Dado que una persona votó por Ted Cruz, ¿Cuál es la probabilidad que sea de California?
+```{r}
+votos_CaliforniaRepublicanos <- ds.votaciones %>% 
+                            filter(state=="California",
+                                   party=="Republican") %>% 
+                             summarise(sumaVotosCL=sum(votes))
+
+votos_TedCruz <- ds.votaciones %>% 
+                            filter(candidate=="Ted Cruz") %>% 
+                             summarise(sumaVotosTed=sum(votes))
+
+
+probabilidad_California <- (votos_CaliforniaRepublicanos/votos_TedCruz)*100
+probabilidad_California
+```
+R// La probailidad de que una persona de California haya votado por TedCruz es del 19.67%
+
+
+
+
+
+### 9. Dado que una persona es de Texas, ¿Cuál es la probabilidad que vote por Donald Trump?
+```{r}
+votos_TexasRepublicanos <- ds.votaciones %>% 
+                            filter(state=="Texas",
+                                   party=="Republican") %>% 
+                             summarise(sumaVotosTX=sum(votes))
+
+votos_TexasRepublicanos
+
+
+
+votos_Donald <- ds.votaciones %>% 
+                            filter(candidate=="Donald Trump") %>% 
+                             summarise(sumaVotosTed=sum(votes))
+
+votos_Donald
+
+
+
+probabilidad_Texas <- (votos_TexasRepublicanos/votos_Donald)*100
+probabilidad_Texas
+
+
+
+```
+R//La probabilidad que una persona de Texas vote por Donald Trump es de 20.57%
+
+
+
+
+
+### 10. ¿Qué condado de los Estados Unidos es el que tuvo la mayor cantidad de votantes?
+```{r}
+ds.votaciones %>% group_by(county) %>% 
+  summarise(votos=n()) %>% 
+  arrange(-votos) %>% 
+  top_n(5)
+```
+R// El condado de los Estados Unidos que tuvo mas votantes fue Washington.
+
+
+### 11. Cantidad de votos por candidato
+```{r}
+CantidadVotos <- ds.votaciones %>% group_by(candidate) %>% 
+          summarise(Votos=sum(votes)) %>% 
+          arrange(-Votos)
+
+CantidadVotos
+```
+#### Grafíca de candidatos
+```{r}
+library(ggplot2)
+
+ggplot(data=CantidadVotos,aes(x=reorder(candidate,-Votos),
+                              y=Votos,fill = candidate))+
+  scale_y_continuous(labels = scales::comma)+
+  geom_bar(stat="sum")+
+  xlab("Candidatos")+
+  ylab("Votos")+
+  ggtitle("Votos X Candidato")+
+  theme(axis.text.x=element_text(angle=45, hjust=1, size = 7),  legend.position="right")
+```
+Se observan los 16 candidatos, sin embargo no se aprecia muy bien, por lo que se recomienda tener los primeros 5.
+
+#### Top 5 de candidatos con mas votos
+
+```{r}
+ggplot(data=head(CantidadVotos),aes(y=reorder(candidate,Votos),
+                              x=Votos,fill = candidate))+
+  scale_x_continuous(labels = scales::comma)+
+  geom_bar(stat="sum")+
+  xlab("Candidatos")+
+  ylab("Votos")+
+  ggtitle("Top 5 de candidatos")+
+  geom_text(aes(label = scales::comma(as.integer(Votos))))+
+  theme(axis.text.x=element_text(angle=0, hjust=1, size = 10),  legend.position="null")
+
+
+
+```
+
+### 12. Mostrar los 7 estados con mas afluencia de votaciones
+Se muestra la proporción de los 7 estados que tuvieron mayor cantidad de votaciones.
+
+```{r}
+library(scales)
+
+## Obtener Votos por estado y ordenarlos de mayor a menor
+VotosPorEstado <- ds.votaciones %>% 
+  group_by(state) %>% 
+  summarise(votos=sum(votes)) %>% 
+  arrange(-votos)
+
+## Obtener total de votos
+sumatoriaTotalVotos <- sum(ds.votaciones$votes)
+
+## Proporción de cada estado
+VotosPorEstado$proporcion <- (VotosPorEstado$votos)/(sumatoriaTotalVotos)
+
+
+ggplot(data=head(VotosPorEstado,7),
+       aes(y=reorder(state,proporcion),x=proporcion,fill = state))+
+    
+    geom_bar(stat = "identity",color="white")+
+    geom_text(aes(label=percent(proporcion)),
+              position=position_stack(vjust=0.5),color="black",size=4.5)+
+    coord_polar(theta = "y")+
+  
+    theme_minimal()+
+    theme(axis.text.y=element_blank()  # Quitar leyenda del eje vertical
+            #,legend.position=""        #Quitar leyenda general
+            )+
+  ### Etiquetas
+    xlab("")+
+    ylab("")+
+    ggtitle("7 Estados mas significativos")
+
+
+
+```
+
